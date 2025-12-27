@@ -8,7 +8,8 @@ import LoginScreen from './LoginScreen';
 import SetHomeLocation from './SetHome';
 import BusList from './BusList';
 import RouteMap from './RouteMap';
-import { auth } from '../firebase';
+import DriverDashboard from './DriverDashboard';
+import { auth, database } from '../firebase';
 
 const Stack = createStackNavigator();
 const LoggedStack = createStackNavigator();
@@ -24,19 +25,46 @@ function LoggedLayout() {
 }
 
 const AppNavigator = () => {
-  const [user, setUser] = useState({ loggedIn: false });
-  useEffect(()=>{
-    onAuthStateChanged(auth,(user)=>{
+  const [user, setUser] = useState(null);
+  const [role, setRole] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
+      if (user) {
+        // Fetch user role
+        try {
+          const snapshot = await database.ref(`users/${user.uid}/role`).once('value');
+          const userRole = snapshot.val();
+          setRole(userRole || 'user'); // Default to 'user' if null
+        } catch (error) {
+          console.error("Error fetching role:", error);
+          setRole('user'); // Default to user if error
+        }
+      } else {
+        setRole(null);
+      }
+      setLoading(false);
     });
-  },[]);
+    return unsubscribe;
+  }, []);
+
+  if (loading) {
+    return null; // Or a splash screen
+  }
+
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="LoginScreen">
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
         {user ? (
-          <Stack.Screen name="Login" component={LoggedLayout} options={{headerShown:false}}/>
+          role === 'driver' ? (
+            <Stack.Screen name="DriverDashboard" component={DriverDashboard} />
+          ) : (
+            <Stack.Screen name="UserHome" component={LoggedLayout} />
+          )
         ) : (
-          <Stack.Screen name="Login" component={LoginScreen} options={{headerShown:false}}/>
+          <Stack.Screen name="Login" component={LoginScreen} />
         )}
       </Stack.Navigator>
     </NavigationContainer>

@@ -3,10 +3,14 @@ import { View, StyleSheet, Text, Linking, ScrollView } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { FAB, List, Divider } from 'react-native-paper';
 import axios from 'axios';
+import { database } from '../firebase';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const RouteMap = ({ route }) => {
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [busLocation, setBusLocation] = useState(null);
+  const { busNumber } = route.params;
 
   useEffect(() => {
     // Function to fetch coordinates for each route from the given address
@@ -40,9 +44,30 @@ const RouteMap = ({ route }) => {
     const delay = 3000; // 3 seconds
     const timer = setTimeout(() => fetchRouteCoordinates(route.params.routes), delay); // Access the routes array from route.params
 
+    // Live Location Subscription
+    if (busNumber) {
+      const locationRef = database.ref(`buses/${busNumber}/liveLocation`);
+      locationRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          setBusLocation({
+            latitude: data.latitude,
+            longitude: data.longitude,
+            timestamp: data.timestamp
+          });
+        }
+      });
+
+      // Cleanup subscription
+      return () => {
+        clearTimeout(timer);
+        locationRef.off();
+      }
+    }
+
     // Clear the timer when the component unmounts
     return () => clearTimeout(timer);
-  }, [route.params.routes]); // Make sure to include route.params.routes in the dependency array
+  }, [route.params.routes, busNumber]);
 
   const openInGoogleMaps = () => {
     const routeUrl = routes
@@ -77,6 +102,24 @@ const RouteMap = ({ route }) => {
           ))}
           {routes.length > 1 && (
             <Polyline coordinates={routes} strokeColor="#000" strokeWidth={2} />
+          )}
+          {busLocation && (
+            <Marker coordinate={busLocation} title={`Bus ${busNumber}`}>
+              <View style={styles.busMarker}>
+                <MaterialCommunityIcons name="bus" size={30} color="blue" />
+              </View>
+              <MapView.Callout>
+                <View>
+                  <Text style={{ fontWeight: 'bold' }}>Bus {busNumber}</Text>
+                  <Text>Live Location</Text>
+                  {busLocation.timestamp && (
+                    <Text style={{ fontSize: 10, color: 'gray' }}>
+                      Updated: {new Date(busLocation.timestamp).toLocaleTimeString()}
+                    </Text>
+                  )}
+                </View>
+              </MapView.Callout>
+            </Marker>
           )}
         </MapView>
       </View>
@@ -113,6 +156,13 @@ const RouteMap = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  busMarker: {
+    backgroundColor: 'white',
+    padding: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'blue',
   },
   mapContainer: {
     flex: 1,

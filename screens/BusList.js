@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { Searchbar, Card } from 'react-native-paper';
-import axios from 'axios';
+import { database } from '../firebase';
 
 const BusList = ({ navigation, route }) => {
   const { selectedLocation } = route.params;
@@ -13,10 +13,11 @@ const BusList = ({ navigation, route }) => {
     // Fetch data from Firebase Realtime Database
     const fetchData = async () => {
       try {
-        const response = await axios.get(
-          process.env.FIREBASE_DB_URL
-        );
-        setBuses(response.data);
+        const snapshot = await database.ref('/').once('value');
+        const data = snapshot.val();
+        // Ensure data is an array
+        const busList = Array.isArray(data) ? data : Object.values(data || {});
+        setBuses(busList);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -43,9 +44,9 @@ const BusList = ({ navigation, route }) => {
     setSearchQuery(query);
   };
 
-  const handleCardClick = (routes) => {
+  const handleCardClick = (bus) => {
     // Handle the navigation to RouteMap with the selected routes
-    navigation.navigate('RouteMap', { routes });
+    navigation.navigate('RouteMap', { routes: bus['Bus Route'], busNumber: bus['BusNo'] });
   };
 
   if (loading) {
@@ -70,7 +71,7 @@ const BusList = ({ navigation, route }) => {
           searchedBuses.map((bus) => (
             <TouchableOpacity
               key={bus['BusNo']}
-              onPress={() => handleCardClick(bus['Bus Route'])}
+              onPress={() => handleCardClick(bus)}
             >
               <Card style={styles.busItem}>
                 <Card.Title title={`Bus ${bus['BusNo']}`} />

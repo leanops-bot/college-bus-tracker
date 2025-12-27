@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Alert, KeyboardAvoidingView } from 'react-native';
 import { TextInput, Button, ActivityIndicator } from 'react-native-paper';
-import { auth } from '../firebase'
+import { auth, database } from '../firebase'
+import { SegmentedButtons } from 'react-native-paper';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState('user'); // 'user' or 'driver'
 
   const handleLogin = async () => {
     // Validate login credentials
@@ -36,8 +38,16 @@ const LoginScreen = ({ navigation }) => {
 
     try {
       // Create a new user with email and password
-      const user = await auth.createUserWithEmailAndPassword(email, password);
-      console.log(user)
+      const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+      const user = userCredential.user;
+
+      // Store user role in Realtime Database
+      await database.ref('users/' + user.uid).set({
+        email: email,
+        role: role
+      });
+
+      console.log('User registered with role:', role);
       // Redirect to the home screen
       navigation.navigate('SetHome');
 
@@ -61,10 +71,26 @@ const LoginScreen = ({ navigation }) => {
         label="Password"
         value={password}
         onChangeText={(text) => setPassword(text)}
-        secureTextEntry
         mode="outlined"
         style={styles.input}
       />
+
+      <View style={styles.roleContainer}>
+        <SegmentedButtons
+          value={role}
+          onValueChange={setRole}
+          buttons={[
+            {
+              value: 'user',
+              label: 'User',
+            },
+            {
+              value: 'driver',
+              label: 'Driver',
+            },
+          ]}
+        />
+      </View>
 
       <Button
         mode="contained"
@@ -94,6 +120,9 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   input: {
+    marginBottom: 16,
+  },
+  roleContainer: {
     marginBottom: 16,
   },
   button: {

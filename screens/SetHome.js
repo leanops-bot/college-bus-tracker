@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import { Searchbar } from 'react-native-paper';
-import axios from 'axios';
+import { database } from '../firebase';
 
 const SetHome = ({ navigation }) => {
   const [selectedLocation, setSelectedLocation] = useState('');
@@ -13,12 +13,15 @@ const SetHome = ({ navigation }) => {
     // Fetch data from Firebase Realtime Database
     const fetchData = async () => {
       try {
-        const response = await axios.get(
-          process.env.FIREBASE_DB_URL
-        );
-        const allRoutes = response.data.reduce((acc, bus) => {
+        const snapshot = await database.ref('/').once('value');
+        const data = snapshot.val();
+        // Ensure data is array
+        const busList = Array.isArray(data) ? data : Object.values(data || {});
+
+        const allRoutes = busList.reduce((acc, bus) => {
           // Merge all routes into a single array
-          return [...acc, ...bus['Bus Route']];
+          const routes = bus['Bus Route'] || [];
+          return [...acc, ...routes];
         }, []);
         // Remove duplicates and sort the routes alphabetically
         const uniqueSortedLocations = [...new Set(allRoutes)].sort();
